@@ -3,16 +3,23 @@
 #include <math.h>
 #include <stdlib.h>
 
+#define BLOCK_SIZE_BYTE 16
+#define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
+
 int* extractBits(int number,  int totalBits);
 int getSpecificBit(int number, int position);
 int calcTotalBits(int number);
 int getSBox(int line, int column);
 int charHexToInt(char hexChar);
-void performSBox(char* cypherText, int size);
+void performSBox(char* stateCypher);
+void performShiftRows(char* stateCypher);
+void shiftArrayToLeft(char *shiftText, int rounds, int startIndex);
 
 int main(){
-  char plainText[] = "LoremIpsumDorSit";
-  performSBox(plainText, 16);
+  char plainText[] = "LoremIpsumDorSit";//Must be 16 bytes
+  performShiftRows(plainText);
+  // performSBox(plainText);
+  printf("%s", plainText);
   printf("\n");
 }
 
@@ -60,15 +67,47 @@ int charHexToInt(char hexChar){
   return strtol(&hexChar, &endptr, 16);
 }
 
-void performSBox(char* cypherText, int size){
+
+void shiftArrayToLeft(char *shiftText, int rounds, int startIndex){
+  //Since I am handling the matrix as a one direction array, I need to make sure
+  //that I change only what is correct. As if I was changing the line of a 4x4 matrix
+  //|A0|...|A12|
+  //|A1|...|A13|
+  //|A2|...|A14|
+  //|A3|...|A15|
+  const int lineSize = 4;//Same as manipulation size
+  const int columnSize = 4;
+  char firstChar;
+  int lastIndex = startIndex+(columnSize-1)*lineSize;
+  for(int round = 0; round < rounds; round++){
+    firstChar = shiftText[startIndex];
+    for(int i=startIndex; i < lastIndex; i+=lineSize){//Ex.: Jump from A0 to A4 ... A12
+      shiftText[i] = shiftText[i+lineSize];
+    }
+    shiftText[lastIndex] = firstChar;
+  }
+}
+
+void performSBox(char* stateCypher){
   //This is the Substitution Layer throughout the Lookup table
   char charInHex[2];
   long int line, column;
-  for(int i = 0; i<size; i++){
-    sprintf(charInHex, "%x", cypherText[i]);
+  for(int i = 0; i < BLOCK_SIZE_BYTE; i++){
+    sprintf(charInHex, "%x", stateCypher[i]);
     line = charHexToInt(charInHex[0]);
     column = charHexToInt(charInHex[1]);
-    cypherText[i] = (char) getSBox(line, column);
+    stateCypher[i] = (char) getSBox(line, column);
   }
-  printf("%s", cypherText);
+}
+
+void performShiftRows(char* stateCypher){
+  //The specification says that the manipulation happens in a 4x4 array.
+  //Instead, I use 1x16 wich is easyer to compute and pass arround
+  const int manipulationSize = 4;//It is 4 because it was supposed to be `4`x4
+  int startIndex;
+  int rounds = BLOCK_SIZE_BYTE/4;
+  for(int round = 0; round < rounds; round++){
+    startIndex = round;
+    shiftArrayToLeft(stateCypher, round, startIndex);
+  }
 }
