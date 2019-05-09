@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define BLOCK_SIZE_BYTE 16
 #define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
@@ -11,9 +12,15 @@ int getSpecificBit(int number, int position);
 int calcTotalBits(int number);
 int getSBox(int line, int column);
 int charHexToInt(char hexChar);
+int applyModularReduction(int number);
+int galoisFieldAdd(int firstVal, int secondVal);
+int bitShiftLeft(int number);
+bool needModReduce(int number);
 void performSBox(char* stateCypher);
 void performShiftRows(char* stateCypher);
 void shiftArrayToLeft(char *shiftText, int rounds, int startIndex);
+void performMixColumn(char* stateCypher);
+void vectMatrixMultip(char **columnState);
 
 int main(){
   char plainText[] = "LoremIpsumDorSit";//Must be 16 bytes
@@ -67,7 +74,6 @@ int charHexToInt(char hexChar){
   return strtol(&hexChar, &endptr, 16);
 }
 
-
 void shiftArrayToLeft(char *shiftText, int rounds, int startIndex){
   //Since I am handling the matrix as a one direction array, I need to make sure
   //that I change only what is correct. As if I was changing the line of a 4x4 matrix
@@ -88,6 +94,35 @@ void shiftArrayToLeft(char *shiftText, int rounds, int startIndex){
   }
 }
 
+bool needModReduce(int number){
+  return getSpecificBit(number, 7);
+}
+
+int applyModularReduction(int number){
+  //Modular reduction is used according to Galois Field
+  //and using P(x) = x^8 + x^4 + x^3 + x + 1
+  //Since  the number is << 1 we do not need the x^8 here, but we
+  //sum the others coefficients wich is a simple bitwise XOR.
+  //In GF(2^8), P(x) is '00011011' = 0x1B
+  return number^0x1B;
+}
+
+int galoisFieldAdd(int firstVal, int secondVal){
+  //Additions in the GF(2^8) wich are simple XOR operations
+  return firstVal^secondVal;
+}
+
+int bitShiftLeft(int number){
+  //Number has 8 bits before the shift
+  int shifted = number<<1;
+  if(getSpecificBit(shifted, 8)){
+    //If in the index 8 we have a 1 then we should remove it
+    //Because our number has 8 bits and the last index is 7
+    shifted ^= 256;//To remove the 1 in the Index 8
+  }
+  return shifted;
+}
+
 void performSBox(char* stateCypher){
   //This is the Substitution Layer throughout the Lookup table
   char charInHex[2];
@@ -96,18 +131,69 @@ void performSBox(char* stateCypher){
     sprintf(charInHex, "%x", stateCypher[i]);
     line = charHexToInt(charInHex[0]);
     column = charHexToInt(charInHex[1]);
-    stateCypher[i] = (char) getSBox(line, column);
+    stateCypher[i] = getSBox(line, column);
   }
 }
 
 void performShiftRows(char* stateCypher){
   //The specification says that the manipulation happens in a 4x4 array.
   //Instead, I use 1x16 wich is easyer to compute and pass arround
-  const int manipulationSize = 4;//It is 4 because it was supposed to be `4`x4
   int startIndex;
   int rounds = BLOCK_SIZE_BYTE/4;
   for(int round = 0; round < rounds; round++){
     startIndex = round;
     shiftArrayToLeft(stateCypher, round, startIndex);
+  }
+}
+
+void vectMatrixMultip(char **columnState){
+  //Vector Matrix Multiplication for 2 number in a given line
+  // ( C0 )   (02 03 01 01)   (B0)
+  // ( C1 ) = (01 02 03 01) * (B1)
+  // ( C2 )   (01 01 02 03)   (B2)
+  // ( C3 )   (03 01 01 02)   (B3)
+//Remember that data is distributed UP to DOWN and LEFT to RIGHT
+  const int elemSize = BLOCK_SIZE_BYTE/4;
+  int intVal, lineColState, multiVal, multiSum;//multiVal = Multiplication Value
+  int mixColumnConsts[4][4] = {
+    {02, 03, 01, 01},
+    {01, 02, 03, 01},
+    {01, 01, 02, 03},
+    {03, 01, 01, 02}
+  };
+  for(int line = 0; line < elemSize; line++){
+    multiSum = 0;
+    for(int column = 0; column < elemSize; column++){
+      lineColState = column;
+      intVal = (int)*(columnState[lineColState]);
+      if (mixColumnConsts[line][column] != 1) {
+        multiVal = bitShiftLeft(intVal);
+        if(mixColumnConsts[line][column] == 03){
+          multiVal = galoisFieldAdd(multiVal, intVal);
+        }
+        if(needModReduce(intVal)){
+          multiVal = applyModularReduction(multiVal);
+        }
+      } else {
+        multiVal = intVal;//Since the Const is 1 then it wont change
+      }
+      multiSum = galoisFieldAdd(multiSum, multiVal);
+    }
+    *(columnState[line]) = multiSum;
+  }
+}
+
+void performMixColumn(char* stateCypher){
+  //Perform Mix Column for all columns
+  int startIndex, lastIndex;
+  int columns = BLOCK_SIZE_BYTE/4;
+  char *charGroup[4];
+  for(int column = 0; column < columns; column++){
+    startIndex = column*4;//4 is the manipulation size
+    lastIndex = startIndex+4;
+    for(int i=startIndex, j = 0; i < lastIndex; i++, j++){//Ex.: Goes from B0 to B1 ... B3
+      charGroup[j] = &stateCypher[i];
+    }
+    vectMatrixMultip(charGroup);
   }
 }
