@@ -15,18 +15,21 @@ int charHexToInt(char hexChar);
 int applyModularReduction(int number);
 int galoisFieldAdd(int firstVal, int secondVal);
 int bitShiftLeft(int number);
+int substitutionBox(int num);
 bool needModReduce(int number);
-void performSBox(char* stateCypher);
-void performShiftRows(char* stateCypher);
-void shiftArrayToLeft(char *shiftText, int rounds, int startIndex);
-void performMixColumn(char* stateCypher);
-void vectMatrixMultip(char **columnState);
+void blockTextToInt(char *text, int *integers);
+void performSBox(int *stateCypher);
+void performShiftRows(int *stateCypher);
+void shiftArrayToLeft(int *shiftText, int rounds, int startIndex);
+void performMixColumn(int *stateCypher);
+void vectMatrixMultip(int **columnState);
 
 int main(){
   char plainText[] = "LoremIpsumDorSit";//Must be 16 bytes
-  performShiftRows(plainText);
+  int stateCypher[16];
+  blockTextToInt(plainText, stateCypher);
+  performShiftRows(stateCypher);
   // performSBox(plainText);
-  printf("%s", plainText);
   printf("\n");
 }
 
@@ -74,7 +77,7 @@ int charHexToInt(char hexChar){
   return strtol(&hexChar, &endptr, 16);
 }
 
-void shiftArrayToLeft(char *shiftText, int rounds, int startIndex){
+void shiftArrayToLeft(int *shiftText, int rounds, int startIndex){
   //Since I am handling the matrix as a one direction array, I need to make sure
   //that I change only what is correct. As if I was changing the line of a 4x4 matrix
   //|A0|...|A12|
@@ -83,19 +86,28 @@ void shiftArrayToLeft(char *shiftText, int rounds, int startIndex){
   //|A3|...|A15|
   const int lineSize = 4;//Same as manipulation size
   const int columnSize = 4;
-  char firstChar;
+  int firstVal;
   int lastIndex = startIndex+(columnSize-1)*lineSize;
   for(int round = 0; round < rounds; round++){
-    firstChar = shiftText[startIndex];
+    firstVal = shiftText[startIndex];
     for(int i=startIndex; i < lastIndex; i+=lineSize){//Ex.: Jump from A0 to A4 ... A12
       shiftText[i] = shiftText[i+lineSize];
     }
-    shiftText[lastIndex] = firstChar;
+    shiftText[lastIndex] = firstVal;
   }
 }
 
 bool needModReduce(int number){
   return getSpecificBit(number, 7);
+}
+
+int substitutionBox(int num){
+  char charInHex[2];
+  long int line, column;
+  sprintf(charInHex, "%x", num);
+  line = charHexToInt(charInHex[0]);
+  column = charHexToInt(charInHex[1]);
+  return getSBox(line, column);
 }
 
 int applyModularReduction(int number){
@@ -123,19 +135,20 @@ int bitShiftLeft(int number){
   return shifted;
 }
 
-void performSBox(char* stateCypher){
-  //This is the Substitution Layer throughout the Lookup table
-  char charInHex[2];
-  long int line, column;
-  for(int i = 0; i < BLOCK_SIZE_BYTE; i++){
-    sprintf(charInHex, "%x", stateCypher[i]);
-    line = charHexToInt(charInHex[0]);
-    column = charHexToInt(charInHex[1]);
-    stateCypher[i] = getSBox(line, column);
+void blockTextToInt(char *text, int *integers){
+  for(int i=0; i<BLOCK_SIZE_BYTE; i++){
+    integers[i] = (int)text[i];
   }
 }
 
-void performShiftRows(char* stateCypher){
+void performSBox(int *stateCypher){
+  //This is the Substitution Layer throughout the Lookup table
+  for(int i = 0; i < BLOCK_SIZE_BYTE; i++){
+    stateCypher[i] = substitutionBox(stateCypher[i]);
+  }
+}
+
+void performShiftRows(int *stateCypher){
   //The specification says that the manipulation happens in a 4x4 array.
   //Instead, I use 1x16 wich is easyer to compute and pass arround
   int startIndex;
@@ -146,7 +159,7 @@ void performShiftRows(char* stateCypher){
   }
 }
 
-void vectMatrixMultip(char **columnState){
+void vectMatrixMultip(int **columnState){
   //Vector Matrix Multiplication for 2 number in a given line
   // ( C0 )   (02 03 01 01)   (B0)
   // ( C1 ) = (01 02 03 01) * (B1)
@@ -165,7 +178,7 @@ void vectMatrixMultip(char **columnState){
     multiSum = 0;
     for(int column = 0; column < elemSize; column++){
       lineColState = column;
-      intVal = (int)*(columnState[lineColState]);
+      intVal = *(columnState[lineColState]);
       if (mixColumnConsts[line][column] != 1) {
         multiVal = bitShiftLeft(intVal);
         if(mixColumnConsts[line][column] == 03){
@@ -183,17 +196,17 @@ void vectMatrixMultip(char **columnState){
   }
 }
 
-void performMixColumn(char* stateCypher){
+void performMixColumn(int *stateCypher){
   //Perform Mix Column for all columns
   int startIndex, lastIndex;
   int columns = BLOCK_SIZE_BYTE/4;
-  char *charGroup[4];
+  int *intGroup[4];
   for(int column = 0; column < columns; column++){
     startIndex = column*4;//4 is the manipulation size
     lastIndex = startIndex+4;
     for(int i=startIndex, j = 0; i < lastIndex; i++, j++){//Ex.: Goes from B0 to B1 ... B3
-      charGroup[j] = &stateCypher[i];
+      intGroup[j] = &stateCypher[i];
     }
-    vectMatrixMultip(charGroup);
+    vectMatrixMultip(intGroup);
   }
 }
