@@ -19,11 +19,11 @@ int substitutionBox(int num);
 int getRoundCoef(int index);
 bool needModReduce(int number);
 void blockTextToInt(char *text, int *integers);
-void performSBox(int *stateCypher);
-void performShiftRows(int *stateCypher);
+void subBytes(int *stateCypher);
+void ShiftRows(int *stateCypher);
 void shiftArrayToLeft(int *shiftText, int rounds, int startIndex);
-void performMixColumn(int *stateCypher);
-void vectMatrixMultip(int **columnState);
+void mixColumns(int *stateCypher);
+void vectMatrixMultip(int **columnState, bool invert);
 void rotateArrayLeft(int *array, int size);
 void calcAllSubkeys(int keyWords[][4], int *keyCypher);
 void addRoundKey(int *stateCypher, int keyWords[][4], int round);
@@ -37,10 +37,10 @@ int main(){
   // blockTextToInt(plainText, stateCypher);
   for(int round = 0; round <= 10; round++){
     if(round != 0){
-      performSBox(stateCypher);
-      performShiftRows(stateCypher);
+      subBytes(stateCypher);
+      ShiftRows(stateCypher);
       if(round != 10){
-        performMixColumn(stateCypher);
+        mixColumns(stateCypher);
       }
     }
     addRoundKey(stateCypher, keyWords, round);
@@ -118,7 +118,10 @@ void shiftArrayToLeft(int *shiftText, int rounds, int startIndex){
 }
 
 bool needModReduce(int number){
-  return getSpecificBit(number, 7);
+  //0x100 = 0001 0000 0000
+  //Check if the 9th bit is 1. If so we need to reduce it
+  //because its degree is 8 and in GF(2^8) the max is 7
+  return number&0x100;
 }
 
 int substitutionBox(int num){
@@ -135,8 +138,8 @@ int applyModularReduction(int number){
   //and using P(x) = x^8 + x^4 + x^3 + x + 1
   //Since  the number is << 1 we do not need the x^8 here, but we
   //sum the others coefficients wich is a simple bitwise XOR.
-  //In GF(2^8), P(x) is '00011011' = 0x1B
-  return number^0x1B;
+  //In GF(2^8), P(x) is '100011011' = 0x11B
+  return number^0x11B;
 }
 
 int galoisFieldAdd(int firstVal, int secondVal){
@@ -160,20 +163,31 @@ int getRoundCoef(int index){
   return rc[index];
 }
 
+int galoisFieldMultiply(int a, int b) {
+    int sum = 0;
+    while (b > 0) {
+        if (b & 1) sum = sum ^ a;             //If last bit of b is 1, add a to the sum
+        b = b >> 1;                           //divide b by 2, discarding the last bit
+        a = a << 1;                           //multiply a by 2
+        if (needModReduce(a)) a = applyModularReduction(a);
+    }
+    return sum;
+}
+
 void blockTextToInt(char *text, int *integers){
   for(int i=0; i<BLOCK_SIZE_BYTE; i++){
     integers[i] = (int)text[i];
   }
 }
 
-void performSBox(int *stateCypher){
+void subBytes(int *stateCypher){
   //This is the Substitution Layer throughout the Lookup table
   for(int i = 0; i < BLOCK_SIZE_BYTE; i++){
     stateCypher[i] = substitutionBox(stateCypher[i]);
   }
 }
 
-void performShiftRows(int *stateCypher){
+void ShiftRows(int *stateCypher){
   //The specification says that the manipulation happens in a 4x4 array.
   //Instead, I use 1x16 wich is easyer to compute and pass arround
   int startIndex;
@@ -184,7 +198,7 @@ void performShiftRows(int *stateCypher){
   }
 }
 
-void vectMatrixMultip(int **columnState){
+void vectMatrixMultip(int **columnState, bool invert){
   //Vector Matrix Multiplication for 2 number in a given line
   // ( C0 )   (02 03 01 01)   (B0)
   // ( C1 ) = (01 02 03 01) * (B1)
@@ -200,21 +214,21 @@ void vectMatrixMultip(int **columnState){
     {01, 01, 02, 03},
     {03, 01, 01, 02}
   };
+  int invMixColumnConsts[4][4] = {
+    {0x0E, 0x0B, 0x0D, 0x09},
+    {0x09, 0x0E, 0x0B, 0x0D},
+    {0x0D, 0x09, 0x0E, 0x0B},
+    {0x0B, 0x0D, 0x09, 0x0E}
+  };
   for(int line = 0; line < elemSize; line++){
     multiSum = 0;
     for(int column = 0; column < elemSize; column++){
       lineColState = column;
       intVal = *(columnState[lineColState]);
-      if (mixColumnConsts[line][column] != 1) {
-        multiVal = bitShiftLeft(intVal);
-        if(mixColumnConsts[line][column] == 03){
-          multiVal = galoisFieldAdd(multiVal, intVal);
-        }
-        if(needModReduce(intVal)){
-          multiVal = applyModularReduction(multiVal);
-        }
+      if(invert){
+        multiVal = galoisFieldMultiply(intVal, invMixColumnConsts[line][column]);
       } else {
-        multiVal = intVal;//Since the Const is 1 then it wont change
+        multiVal = galoisFieldMultiply(intVal, mixColumnConsts[line][column]);
       }
       multiSum = galoisFieldAdd(multiSum, multiVal);
     }
@@ -226,7 +240,7 @@ void vectMatrixMultip(int **columnState){
   }
 }
 
-void performMixColumn(int *stateCypher){
+void mixColumns(int *stateCypher){
   //Perform Mix Column for all columns
   int startIndex, lastIndex;
   int columns = BLOCK_SIZE_BYTE/4;
@@ -237,7 +251,7 @@ void performMixColumn(int *stateCypher){
     for(int i=startIndex, j = 0; i < lastIndex; i++, j++){//Ex.: Goes from B0 to B1 ... B3
       intGroup[j] = &stateCypher[i];
     }
-    vectMatrixMultip(intGroup);
+    vectMatrixMultip(intGroup, false);
   }
 }
 
