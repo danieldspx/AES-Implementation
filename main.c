@@ -16,6 +16,7 @@ int applyModularReduction(int number);
 int galoisFieldAdd(int firstVal, int secondVal);
 int bitShiftLeft(int number);
 int substitutionBox(int num);
+int getRoundCoef(int index);
 bool needModReduce(int number);
 void blockTextToInt(char *text, int *integers);
 void performSBox(int *stateCypher);
@@ -23,13 +24,32 @@ void performShiftRows(int *stateCypher);
 void shiftArrayToLeft(int *shiftText, int rounds, int startIndex);
 void performMixColumn(int *stateCypher);
 void vectMatrixMultip(int **columnState);
+void rotateArrayLeft(int *array, int size);
+void calcAllSubkeys(int keyWords[][4], int *keyCypher);
+void addRoundKey(int *stateCypher, int keyWords[][4], int round);
 
 int main(){
-  char plainText[] = "LoremIpsumDorSit";//Must be 16 bytes
-  int stateCypher[16];
-  blockTextToInt(plainText, stateCypher);
-  performShiftRows(stateCypher);
-  // performSBox(plainText);
+  // char plainText[] = "LoremIpsumDorSit";//Must be 16 bytes
+  int keyWords[44][4];
+  int stateCypher[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+  int keyCypher[16] = {0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f};
+  calcAllSubkeys(keyWords, keyCypher);
+  // blockTextToInt(plainText, stateCypher);
+  for(int round = 0; round <= 10; round++){
+    if(round != 0){
+      performSBox(stateCypher);
+      performShiftRows(stateCypher);
+      if(round != 10){
+        performMixColumn(stateCypher);
+      }
+    }
+    addRoundKey(stateCypher, keyWords, round);
+  }
+  for(int i = 0; i < 4; i++){
+    for(int j = 0; j < 4; j++){
+      printf("%02x", stateCypher[4*i+j]);
+    }
+  }
   printf("\n");
 }
 
@@ -102,9 +122,9 @@ bool needModReduce(int number){
 }
 
 int substitutionBox(int num){
-  char charInHex[2];
+  char charInHex[3];
   long int line, column;
-  sprintf(charInHex, "%x", num);
+  sprintf(charInHex, "%02x", num);
   line = charHexToInt(charInHex[0]);
   column = charHexToInt(charInHex[1]);
   return getSBox(line, column);
@@ -133,6 +153,11 @@ int bitShiftLeft(int number){
     shifted ^= 256;//To remove the 1 in the Index 8
   }
   return shifted;
+}
+
+int getRoundCoef(int index){
+  int rc[10] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36};
+  return rc[index];
 }
 
 void blockTextToInt(char *text, int *integers){
@@ -168,6 +193,7 @@ void vectMatrixMultip(int **columnState){
 //Remember that data is distributed UP to DOWN and LEFT to RIGHT
   const int elemSize = BLOCK_SIZE_BYTE/4;
   int intVal, lineColState, multiVal, multiSum;//multiVal = Multiplication Value
+  int resultColumnState[4];
   int mixColumnConsts[4][4] = {
     {02, 03, 01, 01},
     {01, 02, 03, 01},
@@ -192,7 +218,11 @@ void vectMatrixMultip(int **columnState){
       }
       multiSum = galoisFieldAdd(multiSum, multiVal);
     }
-    *(columnState[line]) = multiSum;
+    resultColumnState[line] = multiSum;
+  }
+
+  for(int line = 0; line < elemSize; line++){
+    *(columnState[line]) = resultColumnState[line];
   }
 }
 
@@ -208,5 +238,52 @@ void performMixColumn(int *stateCypher){
       intGroup[j] = &stateCypher[i];
     }
     vectMatrixMultip(intGroup);
+  }
+}
+
+void rotateArrayLeft(int *array, int size){
+  int lastIndex = size - 1;
+  int firstVal = array[0];
+  for(int i=0; i < lastIndex; i++){
+    array[i] = array[i+1];
+  }
+  array[lastIndex] = firstVal;
+}
+
+void calcAllSubkeys(int keyWords[][4], int *keyCypher){
+  int lastWordSubkey[4], roundCoef;
+
+  for(int i = 0; i < 4; i++){//Copy the keyCypher to the Word array
+    for(int j = 0; j < 4; j++){
+      keyWords[i][j] = keyCypher[4*i + j];
+    }
+  }
+
+  for(int round = 1; round <= 10; round++){
+    for(int i = 0; i < 4; i++){
+      lastWordSubkey[i] = keyWords[4*round - 1][i];
+    }
+    rotateArrayLeft(lastWordSubkey, 4);
+    for(int i = 0; i<4; i++){
+      lastWordSubkey[i] = substitutionBox(lastWordSubkey[i]);
+    }
+    roundCoef = getRoundCoef(round-1);
+    lastWordSubkey[0] = galoisFieldAdd(lastWordSubkey[0], roundCoef);
+    for(int i = 0; i < 4; i++){//Calc Root Word
+      keyWords[4*round][i] = galoisFieldAdd(lastWordSubkey[i], keyWords[4*(round - 1)][i]);
+    }
+    for(int j = 1; j < 4; j++){//Calc others words of the current subkey
+      for(int i = 0; i < 4; i++){
+        keyWords[4*round + j][i] = galoisFieldAdd(keyWords[4*round + j - 1][i], keyWords[4*(round - 1)+j][i]);
+      }
+    }
+  }
+}
+
+void addRoundKey(int *stateCypher, int keyWords[][4], int round){
+  for(int i = 0; i < 4; i++){
+    for(int j = 0; j < 4; j++){
+      stateCypher[4*i+j] = galoisFieldAdd(stateCypher[4*i+j], keyWords[4*round+i][j]);
+    }
   }
 }
