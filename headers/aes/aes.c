@@ -3,25 +3,11 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 
 #define BLOCK_SIZE_BYTE 16
-
-int getSpecificBit(int number, int position){
-  return (number & (1 << position)) >> position;
-}
-
-int *extractBits(int number, int totalBits){
-  int *bits = (int*)malloc(totalBits*sizeof(int));
-  for(int i = 0; i < totalBits; i++){
-    bits[i] = getSpecificBit(number, i);
-  }
-
-  return bits;
-}
-
-int calcTotalBits(int number){
-  return (int)log2(number) + 1;
-}
+#define DECRYPT true
+#define ENCRYPT false
 
 int getSBox(int line, int column){
   int SBOX[16][16] = {
@@ -72,6 +58,11 @@ int charHexToInt(char hexChar){
   return strtol(&hexChar, &endptr, 16);
 }
 
+int textHexToInt(char *hexChar){
+  char *endptr;
+  return strtol(hexChar, &endptr, 16);
+}
+
 void shiftArrayToLeft(int *shiftText, int rounds, int startIndex){
   //Since I am handling the matrix as a one direction array, I need to make sure
   //that I change only what is correct. As if I was changing the line of a 4x4 matrix
@@ -119,6 +110,10 @@ bool needModReduce(int number){
   return number&0x100;
 }
 
+bool isKey16Bytes(char *key){
+  return strlen(key) == 16;
+}
+
 int substitutionBox(int num, bool inverse){
   char charInHex[3];
   long int line, column;
@@ -146,17 +141,6 @@ int galoisFieldAdd(int firstVal, int secondVal){
   return firstVal^secondVal;
 }
 
-int bitShiftLeft(int number){
-  //Number has 8 bits before the shift
-  int shifted = number<<1;
-  if(getSpecificBit(shifted, 8)){
-    //If in the index 8 we have a 1 then we should remove it
-    //Because our number has 8 bits and the last index is 7
-    shifted ^= 256;//To remove the 1 in the Index 8
-  }
-  return shifted;
-}
-
 int getRoundCoef(int index){
   int rc[10] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36};
   return rc[index];
@@ -173,8 +157,20 @@ int galoisFieldMultiply(int a, int b) {
     return sum;
 }
 
+void addPadding(int startIndex, int *integers){
+  //Add padding to make sure that we have 16 bytes to work with.
+  //Remember that AES works with blocks of 16 bytes
+  for(int i = startIndex; i < BLOCK_SIZE_BYTE; i++){
+    integers[i] = 0;
+  }
+}
+
 void blockTextToInt(char *text, int *integers){
   for(int i=0; i<BLOCK_SIZE_BYTE; i++){
+    if(text[i] == '\0'){
+        addPadding(i, integers);
+        break;
+    }
     integers[i] = (int)text[i];
   }
 }
@@ -310,4 +306,60 @@ void addRoundKey(int *stateCypher, int keyWords[][4], int round){
       stateCypher[4*i+j] = galoisFieldAdd(stateCypher[4*i+j], keyWords[4*round+i][j]);
     }
   }
+}
+
+void hexTextToArrayInt(char *text, int *array){
+  //The cypher length is 32 chars(representing a 16 bytes string)
+  char hexChunk[2];
+  for(int i = 0, j = 0; j < 16; i+= 2, j++){
+    hexChunk[0] = text[i];
+    hexChunk[1] = text[i+1];
+    array[j] = textHexToInt(hexChunk);
+  }
+}
+
+int *encrypt(char *plainText, char *key){
+  if(!isKey16Bytes(key)){
+    return NULL;
+  }
+  int keyCypher[16];
+  int keyWords[44][4];
+  int *stateCypher = (int*)calloc(16, sizeof(int));
+  blockTextToInt(plainText, stateCypher);
+  blockTextToInt(key, keyCypher);
+  calcAllSubkeys(keyWords, keyCypher);
+  for(int round = 0; round <= 10; round++){
+    if(round != 0){
+      subBytes(stateCypher);
+      shiftRows(stateCypher, ENCRYPT);
+      if(round != 10){
+        mixColumns(stateCypher, ENCRYPT);
+      }
+    }
+    addRoundKey(stateCypher, keyWords, round);
+  }
+  return stateCypher;
+}
+
+int *decrypt(char *cypher, char *key){
+  if(!isKey16Bytes(key)){
+    return NULL;
+  }
+  int keyCypher[16];
+  int keyWords[44][4];
+  int *stateCypher = (int*)calloc(16, sizeof(int));
+  hexTextToArrayInt(cypher, stateCypher);
+  blockTextToInt(key, keyCypher);
+  calcAllSubkeys(keyWords, keyCypher);
+  for(int round = 10; round >= 0; round--){
+    addRoundKey(stateCypher, keyWords, round);
+    if(round != 0){
+      if(round != 10){
+        mixColumns(stateCypher, DECRYPT);
+      }
+      shiftRows(stateCypher, DECRYPT);
+      InvSubBytes(stateCypher);
+    }
+  }
+  return stateCypher;
 }
