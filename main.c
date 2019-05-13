@@ -30,6 +30,10 @@ bool isBufferWithSpace(int index, int option){
   return (index < 16 && option == ENCRYPT) || (index < 32 && option == DECRYPT);
 }
 
+bool isBufferIndexIn(int index, int option){
+  return index != 16 && option == ENCRYPT;
+}
+
 int main(){
   // char *plainText = "LoremIpsumDorSit";
   int option, bufferIndex = 0;
@@ -83,16 +87,17 @@ int main(){
 
   // Read File
   bufferIndex = 0;
-  while((charRead = fgetc(fileRead)) != EOF){
-    //FIXME: When reaches EOF it jumps out without padding && encrypting the last block 
+  while((charRead = fgetc(fileRead)) != EOF || isBufferIndexIn(bufferIndex, option)){
     if(isBufferWithSpace(bufferIndex, option)){
       bufferRead[bufferIndex] = charRead;
       bufferIndex++;
     }
 
-    if(!isBufferWithSpace(bufferIndex, option)){
-      bufferIndex = 0;
+    if(!isBufferWithSpace(bufferIndex, option) || charRead == EOF){
       if(option == ENCRYPT){
+        if(charRead == EOF && isBufferIndexIn(bufferIndex, option)){
+          bufferRead[bufferIndex-1] = '\0';
+        }
         printf("Encrypting block...\n");
         bufferResult = encrypt(bufferRead, key);
         for(int i = 0; i < 16; i++){//Write on the file
@@ -100,12 +105,19 @@ int main(){
         }
       } else {
         printf("Decrypting block...\n");
-        printf("%s\n", bufferRead);
         bufferResult = decrypt(bufferRead, key);
+        // printf("%s\n", bufferResult);
         for(int i = 0; i < 16; i++){//Write on the file
-          fprintf(fileWrite, "%c", bufferResult[i]);
+          if(bufferResult[i] != 0){//The zero was added in the padding so it shouldnt be printed
+            fprintf(fileWrite, "%c", bufferResult[i]);
+          }
         }
       }
+      bufferIndex = 0;
+    }
+
+    if(charRead == EOF){
+      break;
     }
   }
 
