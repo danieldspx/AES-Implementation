@@ -130,8 +130,6 @@ int substitutionBox(int num, bool inverse){
 int applyModularReduction(int number){
   //Modular reduction is used according to Galois Field
   //and using P(x) = x^8 + x^4 + x^3 + x + 1
-  //Since  the number is << 1 we do not need the x^8 here, but we
-  //sum the others coefficients wich is a simple bitwise XOR.
   //In GF(2^8), P(x) is '100011011' = 0x11B
   return number^0x11B;
 }

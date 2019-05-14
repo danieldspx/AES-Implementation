@@ -1,64 +1,43 @@
-//Pag 105 do livro
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include "headers/aes/aes.h"
+#include "headers/utils/utils.h"
 
 #define ENCRYPT 1
 #define DECRYPT 2
 
-void clearScreen(){
-  system("clear || cls");
-}
-
-void replaceExtension(char *filename, char *newExtension){
-    char *end = filename + strlen(filename);//End points to the last position of filename
-
-    while (end > filename && *end != '.') {//Goes backwards until find the '.'
-        --end;
-    }
-
-    if (end > filename) {//Inserts the \0 to say that the strings ends at this point
-        *end = '\0';
-    }
-
-    strcat(end, newExtension);
-}
-
-bool isBufferWithSpace(int index, int option){
-  return (index < 16 && option == ENCRYPT) || (index < 32 && option == DECRYPT);
-}
-
-bool isBufferIndexIn(int index, int option){
-  return index != 16 && option == ENCRYPT;
-}
-
 int main(){
-  // char *plainText = "LoremIpsumDorSit";
   int option, bufferIndex = 0;
   char *filename = (char*)calloc(128, sizeof(char));//There is no reason to pick specifically 128, but I did it.
   char *path = (char*)calloc(128, sizeof(char));
-
-  strcpy(path, "assets/");
+  char charRead;
 
   char *bufferRead = (char *)calloc(32, sizeof(char));
   int *bufferResult;
-  char *key = (char *)calloc(16, sizeof(char));//16 + '\0'
+  char *key = (char *)calloc(16, sizeof(char));
 
   FILE *fileRead, *fileWrite;
+
   fileRead = fileWrite = NULL;
-  char charRead;
+  strcpy(path, "assets/");
 
   printf("%d - Encrypt\n", ENCRYPT);
   printf("%d - Decrypt\n", DECRYPT);
-  printf("Enter option: ");
+
+  printf("\nEnter option: ");
   scanf("%d", &option);
 
   printf("Enter the key (16 bytes): ");
   scanf("%s", key);
 
-  printf("Enter filename (must be at /assets): ");
+  if(!isKey16Bytes(key)){
+    printf("The KEY size MUST be 16 bytes.\n\n");
+    return 0;
+  }
+
+  printf("Enter the filename (must be at /assets): ");
   scanf("%s", filename);
 
   strcat(path, filename);
@@ -77,17 +56,16 @@ int main(){
   }
 
   remove(path);//Delete file if it exists
-  fileWrite = fopen(path, "a");//Should be append
+  fileWrite = fopen(path, "a");
   if(fileWrite == NULL){
     printf("Erro ao criar arquivo\n");
     return 0;
   }
 
-  printf("\n*** Doing some work ***\n");
+  printf("\n*** Starting ***\n\n");
 
   // Read File
-  bufferIndex = 0;
-  while((charRead = fgetc(fileRead)) != EOF || isBufferIndexIn(bufferIndex, option)){
+  while((charRead = fgetc(fileRead)) != EOF || isBufferIndexBelowBlockSize(bufferIndex, option)){
     if(isBufferWithSpace(bufferIndex, option)){
       bufferRead[bufferIndex] = charRead;
       bufferIndex++;
@@ -95,23 +73,18 @@ int main(){
 
     if(!isBufferWithSpace(bufferIndex, option) || charRead == EOF){
       if(option == ENCRYPT){
-        if(charRead == EOF && isBufferIndexIn(bufferIndex, option)){
-          bufferRead[bufferIndex-1] = '\0';
+        if(charRead == EOF && isBufferIndexBelowBlockSize(bufferIndex, option)){
+          bufferRead[bufferIndex-1] = '\0';//This indicates where we need start the padding
         }
         printf("Encrypting block...\n");
         bufferResult = encrypt(bufferRead, key);
-        for(int i = 0; i < 16; i++){//Write on the file
-          fprintf(fileWrite, "%02x", bufferResult[i]);
-        }
+        writeOnFile(fileWrite, bufferResult, "%02x");
+        free(bufferResult);
       } else {
         printf("Decrypting block...\n");
         bufferResult = decrypt(bufferRead, key);
-        // printf("%s\n", bufferResult);
-        for(int i = 0; i < 16; i++){//Write on the file
-          if(bufferResult[i] != 0){//The zero was added in the padding so it shouldnt be printed
-            fprintf(fileWrite, "%c", bufferResult[i]);
-          }
-        }
+        writeOnFile(fileWrite, bufferResult, "%c");
+        free(bufferResult);
       }
       bufferIndex = 0;
     }
@@ -121,8 +94,10 @@ int main(){
     }
   }
 
-  //Write FILE
+  fclose(fileRead);
+  fclose(fileWrite);
+
   printf("\nFIM\n");
-  // putc(option, stdout);
+
   return 0;
 }
