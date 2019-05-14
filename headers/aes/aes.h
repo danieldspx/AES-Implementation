@@ -2,18 +2,15 @@
 #define _aes_h
   #include <stdbool.h>
 
-  int* extractBits(int number,  int totalBits);
-  int getSpecificBit(int number, int position);
-  int calcTotalBits(int number);
   int getSBox(int line, int column);
   int getInvSBox(int line, int column);
   int charHexToInt(char hexChar);
   int textHexToInt(char *hexChar);
   int applyModularReduction(int number);
   int galoisFieldAdd(int firstVal, int secondVal);
-  int bitShiftLeft(int number);
   int substitutionBox(int num, bool inverse);
   int getRoundCoef(int index);
+  int galoisFieldMultiply(int a, int b);
   bool needModReduce(int number);
   bool isKey16Bytes(char *key);
   void addPadding(int startIndex, int *integers);
