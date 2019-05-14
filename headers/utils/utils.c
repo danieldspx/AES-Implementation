@@ -1,5 +1,6 @@
 #include "utils.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 
@@ -38,4 +39,41 @@ void writeOnFile(FILE *file, int *bufferResult, const char *format){
   } else {
     printf("Key size MUST be 16 bytes.\n");
   }
+}
+
+bool compareFiles(char *filename1, char *filename2){
+  char *path1 = (char*)calloc(128, sizeof(char));
+  char *path2 = (char*)calloc(128, sizeof(char));
+
+  char charRead1 = 0, charRead2 = 0;
+
+  strcpy(path1, "assets/");
+  strcpy(path2, "assets/");
+
+  strcat(path1, filename1);
+  strcat(path2, filename2);
+
+  FILE *file1 = NULL, *file2 = NULL;
+
+  file1 = fopen(path1, "r");
+  file2 = fopen(path2, "r");
+
+  if(file1 == NULL || file2 == NULL){
+    printf("Erro ao abrir arquivos.\n");
+    return false;
+  }
+
+  do{
+    charRead1 = fgetc(file1);
+    charRead2 = fgetc(file2);
+    if(charRead1 != charRead2){//Different
+      return false;
+    }
+  }while(charRead1 != EOF && charRead2 != EOF);
+
+  if(charRead1 != EOF || charRead2 != EOF){//One file has finished first, therefore they are different
+    return false;
+  }
+
+  return true;
 }

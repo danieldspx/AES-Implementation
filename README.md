@@ -42,7 +42,6 @@ De modo geral tem-se algo como demostrado na figura:
 ![Decryption](https://imgur.com/hxkMB02.png)
 
 A etapa das camadas também ocorrem na ordem inversa:
-
 ![Decryption layers order](https://imgur.com/xRIOop0.png)
 
 Para mais informações veja o livro: [Understanding Cryptography by Christof Paar](http://www.crypto-textbook.com)
@@ -67,8 +66,7 @@ ou
 
 Coloque o arquivo em plaintext na pasta assets.
 
-A estrutura de pastas deve ficar assim:
-
+A estrutura de pastas deve ficar como algo assim:
 ![](https://imgur.com/ToD0aJW.png)
 
 Ao executarmos a aplicação teremos a opção de Encrypt (Criptografar) e Decrypt (Descriptografar). É importante que todos os caracteres do arquivo em plaintext não excedam a tabela ASCII (ou que o código ultrapasse 127), caracteres com acentuação não são aceitos. Nossa plaintext para esse exemplo é o arquivo **teste.txt** e possui o seguinte conteúdo:
@@ -92,11 +90,17 @@ Ele vai descriptografar os blocos
 
 E ao final gerará um arquivo com o texto descriptografado e com a extensão **.dec** de *decrypted*. Pode-se observar que o arquivo teste.txt e o teste.dec possuem conteúdos idênticos.
 
+### Compare Files
+Parte da tarefa é desenvolver uma função que compara se dois arquivos são idênticos. Desse modo, no final do modo de *Decrypt* deve-se digitar o nome dos dois arquivos que serão comparados. Ambos os arquivos deverão estar na pasta **/assets**. Sabemos que os arquivos que devem possuir o mesmo conteúdo no nosso exemplo é o **teste.txt** e o **teste.dec**. Observe que ele retornou que ambos os arquivos são idênticos.
+
+
+![](https://imgur.com/PpIQDiu.png)
+
 ## Bibliografia
-http://www.crypto-textbook.com
-https://sites.math.washington.edu/~morrow/336_12/papers/juan.pdf
-[https://csrc.nist.gov/csrc/media/publications/fips/197/final/documents/fips-197.pdf](https://csrc.nist.gov/csrc/media/publications/fips/197/final/documents/fips-197.pdf)
-https://www.youtube.com/watch?v=gP4PqVGudtg
-https://en.wikipedia.org/wiki/Finite_field_arithmetic#Rijndael's_finite_field
-https://en.wikipedia.org/wiki/Multiplication_algorithm#Peasant_or_binary_multiplication
-http://www.herongyang.com/Cryptography/AES-Example-Vector-of-AES-Encryption.html
+- http://www.crypto-textbook.com
+- https://sites.math.washington.edu/~morrow/336_12/papers/juan.pdf
+- https://csrc.nist.gov/csrc/media/publications/fips/197/final/documents/fips-197.pdf
+- https://www.youtube.com/watch?v=gP4PqVGudtg
+- https://en.wikipedia.org/wiki/Finite_field_arithmetic#Rijndael's_finite_field
+- https://en.wikipedia.org/wiki/Multiplication_algorithm#Peasant_or_binary_multiplication
+- http://www.herongyang.com/Cryptography/AES-Example-Vector-of-AES-Encryption.html

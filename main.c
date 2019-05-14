@@ -11,6 +11,8 @@
 int main(){
   int option, bufferIndex = 0;
   char *filename = (char*)calloc(128, sizeof(char));//There is no reason to pick specifically 128, but I did it.
+  char *compareFilename1 = (char*)calloc(128, sizeof(char));
+  char *compareFilename2 = (char*)calloc(128, sizeof(char));
   char *path = (char*)calloc(128, sizeof(char));
   char charRead;
 
@@ -97,7 +99,22 @@ int main(){
   fclose(fileRead);
   fclose(fileWrite);
 
-  printf("\nFIM\n");
+  if(option == DECRYPT){
+    printf("\n*** Compare Files ***\n\n");
+    printf("Filename 1: ");
+    scanf("%s", compareFilename1);
+
+    printf("Filename 2: ");
+    scanf("%s", compareFilename2);
+
+    if(compareFiles(compareFilename1, compareFilename2)){
+      printf("\nOs arquivos são idênticos.\n");
+    } else {
+      printf("\nOs arquivos não são idênticos.\n");
+    }
+  }
+
+  printf("\nEND\n");
 
   return 0;
 }
