@@ -18,20 +18,24 @@ Aqui basicamente colocamos os dados em uma matriz e cada linha é deslocada uma 
 ![Shiftrows sublayer](https://imgur.com/F71akuO.png)
 
 ### MixColumn Sublayer
-Esta é uma transformação da matriz de estado (que representa os 16 bytes sendo manipulados) que mistura cada coluna. Desse modo todo byte de entrada influenciará nos 4 bytes de saida dessa subcamada. Aqui toda a matemática é feita usando o conceito de *Finite Fields* ou *Galois Fiel* com os elementos de GF(2⁸).
+Esta é uma transformação da matriz de estado (que representa os 16 bytes sendo manipulados) que mistura cada coluna. Desse modo todo byte de entrada influenciará nos 4 bytes de saida dessa subcamada. Aqui toda a matemática é feita usando o conceito de *Finite Fields* ou *Galois Field* com os elementos de GF(2⁸).
 
 O que fazemos é pegar cada coluna da matriz de estado resultante da operação anterior (ShiftRows) e multiplicarmos por uma matriz, e o resultado substituímos na coluna original da matriz de estado.
 
-![MixColumn Sublayer](https://imgur.com/KgBwwTU.png)
+![MixColumn Sublayer](https://imgur.com/KgBwwTU.png)  
+
 Observe que a matriz com as constantes é definida na especificação do AES. Exemplo, para encontrarmos C0 fariamos:
-C0 = 02*B0 + 03*B5 + 01*B10 + 01*B15
+C0 = 02 * B0 + 03 * B5 + 01 * B10 + 01 * B15
 As multiplicações são feitas usando os elementos de *Galois field*, depois somamos cada termo (somas em GF são operações XOR bit a bit) e por final, se necessário, fazemos a redução com o polinômio P(x) =  x⁸+x⁴+x³+x+1.
 
 ### Key Schedule
-Usamos a key original de tamanho (128, 192 ou 256 bits) e encontramos as subkeys que serão usadas em cada round. Cada round possui um coeficiente constante para o calculo da subkey. A ideia é que se trabalhamos com 16 bytes e temos 10 rounds para o caso de 128 bits, então precisamos de 10 subkeys + key orignal, que no total são 11 keys. Para o calculo das subkeys colocamos em um array **W** de 44 posições onde cada posição possui 4 bytes e é denominada WORD. O calculo/expansão de cada word ocorre da seguinte forma:
-![Key schedule](https://imgur.com/gONpOcQ.png)
-Observe que a key original é dividida em 4 bytes que são colocados em W[0] ... W[3]. Na função **g** observa-se que recebemos 4 bytes, realizamos uma rotação de bites, operamos a substituição (S-Box) e fazemos a adição XOR com o *RC[i]* onde **i** significa o round e *RC[i]*  é o coeficiente do round que é definido pelo AES como:
-![Round Coefficient](https://imgur.com/iAtn2vc.png)
+Usamos a key original de tamanho 128, 192 ou 256 bits (nesta implementação usamos apenas 128 bits) e encontramos as subkeys que serão usadas em cada round. Cada round possui um coeficiente constante para o calculo da subkey. A ideia é que se trabalhamos com 16 bytes e temos 10 rounds para o caso de 128 bits, então precisamos de 10 subkeys + key orignal, que no total são 11 keys. Para o calculo das subkeys colocamos em um array **W** de 44 posições onde cada posição possui 4 bytes e é denominada WORD. O calculo/expansão de cada word ocorre da seguinte forma:
+![Key schedule](https://imgur.com/gONpOcQ.png)  
+
+Observe que a key original é dividida em 4 bytes que são colocados em W[0] ... W[3]. Na função **g** observa-se que recebemos 4 bytes, realizamos uma rotação de bites, operamos a substituição (S-Box) e fazemos a adição XOR com o *RC[i]* onde **i** significa o round e *RC[i]*  é o coeficiente do round que é definido pelo AES como:  
+
+![Round Coefficient](https://imgur.com/iAtn2vc.png)  
+
 O resultado de toda essa função **g** é utilizado na composição da **RootWord** que se encontra nos indices raizes de cada subkey como: W[4], W[8], W[12] ... W[40].
 
 Após calculamos as subkeys elas podem ser usadas em cada **Key Addition Layer**, onde fazemos a soma XOR de cada WORD da subkey do round com a matriz estado (que representa o estado na cifra).
@@ -41,7 +45,8 @@ Para descriptografar em AES devemos inverter todas as camadas.
 De modo geral tem-se algo como demostrado na figura:
 ![Decryption](https://imgur.com/hxkMB02.png)
 
-A etapa das camadas também ocorrem na ordem inversa:
+A etapa das camadas também ocorrem na ordem inversa:  
+
 ![Decryption layers order](https://imgur.com/xRIOop0.png)
 
 Para mais informações veja o livro: [Understanding Cryptography by Christof Paar](http://www.crypto-textbook.com)
@@ -66,7 +71,8 @@ ou
 
 Coloque o arquivo em plaintext na pasta assets.
 
-A estrutura de pastas deve ficar como algo assim:
+A estrutura de pastas deve ficar como algo assim:  
+
 ![](https://imgur.com/ToD0aJW.png)
 
 Ao executarmos a aplicação teremos a opção de Encrypt (Criptografar) e Decrypt (Descriptografar). É importante que todos os caracteres do arquivo em plaintext não excedam a tabela ASCII (ou que o código ultrapasse 127), caracteres com acentuação não são aceitos. Nossa plaintext para esse exemplo é o arquivo **teste.txt** e possui o seguinte conteúdo:
