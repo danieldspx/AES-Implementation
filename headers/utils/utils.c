@@ -29,10 +29,10 @@ bool isBufferIndexBelowBlockSize(int index, int option){
   return index < 16 && option == ENCRYPT;
 }
 
-void writeOnFile(FILE *file, int *bufferResult, const char *format){
+void writeOnFile(FILE *file, int *bufferResult, const char *format, int mode){
   if(bufferResult != NULL){
     for(int i = 0; i < 16; i++){//Write on the file
-      if(bufferResult[i] != 0){//The zero was added in the padding so it shouldnt be printed
+      if(bufferResult[i] != 0 || mode == ENCRYPT){//The zero was added in the padding so it shouldnt be printed
         fprintf(file, format, bufferResult[i]);
       }
     }

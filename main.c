@@ -80,12 +80,12 @@ int main(){
         }
         printf("Encrypting block...\n");
         bufferResult = encrypt(bufferRead, key);
-        writeOnFile(fileWrite, bufferResult, "%02x");
+        writeOnFile(fileWrite, bufferResult, "%02x", ENCRYPT);
         free(bufferResult);
       } else {
         printf("Decrypting block...\n");
         bufferResult = decrypt(bufferRead, key);
-        writeOnFile(fileWrite, bufferResult, "%c");
+        writeOnFile(fileWrite, bufferResult, "%c", DECRYPT);
         free(bufferResult);
       }
       bufferIndex = 0;

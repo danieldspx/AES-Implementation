@@ -166,11 +166,11 @@ void addPadding(int startIndex, int *integers){
 
 void blockTextToInt(char *text, int *integers){
   for(int i=0; i<BLOCK_SIZE_BYTE; i++){
-    if(text[i] == '\0'){
+    if(text[i] == '\0' || text[i] == EOF){
         addPadding(i, integers);
         break;
     }
-    integers[i] = (int)text[i];
+    integers[i] = text[i];
   }
 }
 
